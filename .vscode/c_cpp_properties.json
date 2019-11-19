@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "AT89C51",
+            "includePath": [
+                "D:/Program Files (x86)/Keil/C51/INC",
+                "D:/Program Files (x86)/Keil/C51/INC/Atmel",
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "intelliSenseMode": "msvc-x64"
+        }
+    ],
+    "version": 4
+}

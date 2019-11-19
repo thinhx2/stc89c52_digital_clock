@@ -50,3 +50,12 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+
+/*.lst
+/*.obj
+/*.__i
+/stc89c52_digital_clock
+/stc89c52_digital_clock.hex
+/stc89c52_digital_clock.lnp
+/stc89c52_digital_clock.M51
