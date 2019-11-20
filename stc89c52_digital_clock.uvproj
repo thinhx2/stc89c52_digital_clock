@@ -213,7 +213,7 @@
               <RCB>
                 <Type>0</Type>
                 <StartAddress>0x0</StartAddress>
-                <Size>0x10000</Size>
+                <Size>0xffff</Size>
               </RCB>
               <RXB>
                 <Type>0</Type>
@@ -362,9 +362,9 @@
               <FilePath>.\src\common.h</FilePath>
             </File>
             <File>
-              <FileName>keyboard.h</FileName>
+              <FileName>utils.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\src\keyboard.h</FilePath>
+              <FilePath>.\src\utils.h</FilePath>
             </File>
             <File>
               <FileName>led_seg.h</FileName>
@@ -372,15 +372,35 @@
               <FilePath>.\src\led_seg.h</FilePath>
             </File>
             <File>
-              <FileName>utils.h</FileName>
+              <FileName>ds1302.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\src\utils.h</FilePath>
+              <FilePath>.\src\ds1302.h</FilePath>
+            </File>
+            <File>
+              <FileName>keyboard.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\src\keyboard.h</FilePath>
             </File>
           </Files>
         </Group>
         <Group>
           <GroupName>Source</GroupName>
           <Files>
+            <File>
+              <FileName>utils.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\src\utils.c</FilePath>
+            </File>
+            <File>
+              <FileName>led_seg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\src\led_seg.c</FilePath>
+            </File>
+            <File>
+              <FileName>ds1302.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\src\ds1302.c</FilePath>
+            </File>
             <File>
               <FileName>keyboard.c</FileName>
               <FileType>1</FileType>
@@ -390,16 +410,6 @@
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\src\main.c</FilePath>
-            </File>
-            <File>
-              <FileName>led_seg.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\src\led_seg.c</FilePath>
-            </File>
-            <File>
-              <FileName>utils.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\src\utils.c</FilePath>
             </File>
           </Files>
         </Group>

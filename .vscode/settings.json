@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "at89x51.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "intrins.h": "c"
     }
 }

@@ -12,5 +12,6 @@ typedef int i16;
 
 typedef unsigned char uchar;
 typedef unsigned int uint;
+typedef unsigned char byte;
 
 #endif
