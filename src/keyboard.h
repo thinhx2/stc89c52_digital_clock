@@ -1,4 +1,13 @@
 #ifndef STC89C52_DIGITAL_CLOCK_KEYBOARD_H_
 #define STC89C52_DIGITAL_CLOCK_KEYBOARD_H_
 
+#include <at89x51.h>
+
+#define KEY4_PORT P3
+
+sbit KEY_K1 = KEY4_PORT ^ 0;
+sbit KEY_K2 = KEY4_PORT ^ 1;
+sbit KEY_K3 = KEY4_PORT ^ 2;
+sbit KEY_K4 = KEY4_PORT ^ 3;
+
 #endif

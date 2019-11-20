@@ -16,8 +16,8 @@
 #define DS1302_CMD_WDAY 0x8A  // DS1302地址：星期几
 #define DS1302_CMD_YEAR 0x8C  // DS1302地址：年
 
-sbit ACC_0 = ACC ^ 0;
-sbit ACC_7 = ACC ^ 7;
+// sbit ACC_0 = ACC ^ 0;
+// sbit ACC_7 = ACC ^ 7;
 
 sbit DS1302_SC = P3 ^ 6;  // SCLK
 sbit DS1302_IO = P3 ^ 4;  // I/O

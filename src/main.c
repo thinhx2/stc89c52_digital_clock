@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "ds1302.h"
+#include "keyboard.h"
 #include "led_seg.h"
 #include "utils.h"
 
@@ -27,15 +28,29 @@
         TH0 = (H);   \
     }
 
+#define SET_LED_SEG_BUF_ERROR()                                     \
+    {                                                               \
+        led_seg_buf[0] = 0x50;                                      \
+        led_seg_buf[1] = 0x5C;                                      \
+        led_seg_buf[2] = 0x50;                                      \
+        led_seg_buf[3] = 0x50;                                      \
+        led_seg_buf[4] = 0x79;                                      \
+        led_seg_buf[5] = led_seg_buf[6] = led_seg_buf[7] = SEG_OFF; \
+    }
+
 bit k3_click = 0;  // 表示是否最近一次按下了K3按键，需要手动置0，这是特定设计
 int t0_count = 0;
 
 byte clock_mode = 0;
-#define CLOCK_MODE_NUM 2
+#define CLOCK_MODE_NUM 3
 #define CLOCK_MODE_MOD(X) ((X) % CLOCK_MODE_NUM)
 #define CLOCK_MODE_NEXT() \
     { clock_mode = CLOCK_MODE_MOD((clock_mode + 1)); }
 
+// 宏定义：判断YEAR是否为闰年
+#define IS_LEAP_YEAR(YEAR) ((!(YEAR % 100)) ? (!(YEAR % 400)) : (!(YEAR % 4)))
+// 每个月的天数（2月份需特判）
+byte all_mon_day[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 byte led_seg_buf[8];
 
 struct DateTime datetime = {2005, 12, 31, 23, 59, 58};
@@ -52,6 +67,12 @@ void main(void) {
     // u8 _led_code = SEG_OFF;
     uint year;
     byte hour;
+    byte no_or_up_or_down;  // 取值：0、1、2，分别表示：未按下、已按上、已按下
+
+    bit change_date_light, change_date_press;
+    byte change_date_ticks, change_date_select;
+    bit change_time_light, change_time_press;
+    byte change_time_ticks, change_time_select;
 
     clock_mode = 0;
     k3_click = 0;
@@ -92,20 +113,156 @@ void main(void) {
                 led_seg_buf[6] = led_seg_code[year % 10];
                 year /= 10;
                 led_seg_buf[7] = led_seg_code[year % 10];
+                // 设置与日期修改相关的参数
+                change_date_light = 1;  // select选定的时间单位目前是否应该点亮
+                change_date_ticks = 100 - 1;  // 点亮的tick次数
+                change_date_select = 0;       // 默认不处于修改状态
                 // 本模式已初始化
                 modeinfo.mode_0_inited = 1;
             } else {
-                // 局部更新：更长级别的时间单位并不是每次都更新
-                // 只在前一级的时间单位发生溢出的情况下，才考虑本级时间的获取是否应该更新
-                datetime.day = DS1302_GET_DAY();
-                led_seg_buf[0] = led_seg_code[datetime.day % 10];
-                led_seg_buf[1] = led_seg_code[datetime.day / 10];
-                if (datetime.day == 1) {
-                    datetime.mon = DS1302_GET_MON();
-                    led_seg_buf[2] = led_seg_code[datetime.mon % 10] | SEG_DOT;
-                    led_seg_buf[3] = led_seg_code[datetime.mon / 10];
-                    if (datetime.mon == 1) {
+                if (!change_date_select) {
+                    KEY4_PORT = 0xFF;
+                    if (!KEY_K4) {
+                        delay_5us(1500);
+                        if (!KEY_K4) {
+                            change_date_ticks = 100;
+                            change_date_press = 1;
+                            no_or_up_or_down = 0;
+                            change_date_select = (change_date_select + 1) % 4;
+                        }
+                    }
+
+                    // 局部更新：更长级别的时间单位并不是每次都更新
+                    // 只在前一级的时间单位发生溢出的情况下，才考虑本级时间的获取是否应该更新
+                    datetime.day = DS1302_GET_DAY();
+                    led_seg_buf[0] = led_seg_code[datetime.day % 10];
+                    led_seg_buf[1] = led_seg_code[datetime.day / 10];
+                    if (datetime.day == 1) {
+                        datetime.mon = DS1302_GET_MON();
+                        led_seg_buf[2] =
+                            led_seg_code[datetime.mon % 10] | SEG_DOT;
+                        led_seg_buf[3] = led_seg_code[datetime.mon / 10];
+                        if (datetime.mon == 1) {
+                            datetime.year = DS1302_GET_YEAR();
+                            year = datetime.year;
+                            led_seg_buf[4] = led_seg_code[year % 10] | SEG_DOT;
+                            year /= 10;
+                            led_seg_buf[5] = led_seg_code[year % 10];
+                            year /= 10;
+                            led_seg_buf[6] = led_seg_code[year % 10];
+                            year /= 10;
+                            led_seg_buf[7] = led_seg_code[year % 10];
+                        }
+                    }
+                } else {
+                    if (!change_date_ticks) {
+                        change_date_light = !change_date_light;
+                        change_date_ticks = 100;
+                        change_date_press = 0;
+                        no_or_up_or_down = 0;
+                    }
+
+                    // 扫描式检测独立按键
+                    if (!change_date_press) {
+                        KEY4_PORT = 0xFF;
+                        switch ((~KEY4_PORT) & 0x0F) {
+                            case 0x1:
+                                delay_5us(1500);
+                                if (!KEY_K1) {
+                                    no_or_up_or_down = 1;
+                                }
+                                change_date_press = 1;
+                                break;
+                            case 0x2:
+                                delay_5us(1500);
+                                if (!KEY_K2) {
+                                    no_or_up_or_down = 2;
+                                }
+                                change_date_press = 1;
+                                break;
+                            case 0x8:
+                                delay_5us(1500);
+                                if (!KEY_K4) {
+                                    change_date_ticks = 100;
+                                    change_date_select =
+                                        (change_date_select + 1) % 4;
+                                }
+                                change_date_press = 1;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    if (change_date_select == 1) {  // 修改年的状态
+                        datetime.mon = DS1302_GET_MON();
+                        datetime.day = DS1302_GET_DAY();
+                        if (no_or_up_or_down == 1) {  // 按下UP（K1）键
+                            datetime.year = (datetime.year > 2099)
+                                                ? 2000
+                                                : (datetime.year + 1);
+                        } else if (no_or_up_or_down == 2) {  // 按下DOWN（K2）键
+                            datetime.year = (datetime.year < 2001)
+                                                ? 2100
+                                                : (datetime.year - 1);
+                        }
+                        // TODO: 立即设置新的年份
+                        no_or_up_or_down = 0;
+                    } else if (change_date_select == 2) {  // 修改月的状态
                         datetime.year = DS1302_GET_YEAR();
+                        datetime.day = DS1302_GET_DAY();
+                        if (no_or_up_or_down == 1) {  // 按下UP（K1）键
+                            datetime.mon = (datetime.mon + 1) % 13;
+                        } else if (no_or_up_or_down == 2) {  // 按下DOWN（K2）键
+                            datetime.mon =
+                                (datetime.mon < 2) ? 12 : (datetime.mon - 1);
+                        }
+                        // TODO: 立即设置新的月份
+                        no_or_up_or_down = 0;
+                    } else if (change_date_select == 3) {  // 修改日的状态
+                        datetime.year = DS1302_GET_YEAR();
+                        datetime.mon = DS1302_GET_MON();
+                        if (no_or_up_or_down == 1) {  // 按下UP（K1）键
+                            if (datetime.mon == 2) {
+                                datetime.day =
+                                    (datetime.day + 1) %
+                                    (IS_LEAP_YEAR(datetime.year) ? 30 : 29);
+                            } else {
+                                datetime.day = (datetime.day + 1) %
+                                               (all_mon_day[datetime.mon] + 1);
+                            }
+                        } else if (no_or_up_or_down == 2) {  // 按下DOWN（K2）键
+                            if (datetime.mon == 2) {
+                                datetime.day =
+                                    (datetime.day < 2)
+                                        ? (IS_LEAP_YEAR(datetime.year) ? 29
+                                                                       : 28)
+                                        : (datetime.day - 1);
+                            } else {
+                                datetime.day = (datetime.day < 2)
+                                                   ? all_mon_day[datetime.mon]
+                                                   : (datetime.day - 1);
+                            }
+                        }
+                        // TODO: 立即设置新的日
+                        no_or_up_or_down = 0;
+                    }
+
+                    if (change_date_select != 3 || change_date_light) {
+                        led_seg_buf[0] = led_seg_code[datetime.day % 10];
+                        led_seg_buf[1] = led_seg_code[datetime.day / 10];
+                    } else {
+                        led_seg_buf[0] = led_seg_buf[1] = SEG_OFF;
+                    }
+                    if (change_date_select != 2 || change_date_light) {
+                        led_seg_buf[2] =
+                            led_seg_code[datetime.mon % 10] | SEG_DOT;
+                        led_seg_buf[3] = led_seg_code[datetime.mon / 10];
+                    } else {
+                        led_seg_buf[2] = SEG_OFF | SEG_DOT;
+                        led_seg_buf[3] = SEG_OFF;
+                    }
+                    if (change_date_select != 1 || change_date_light) {
                         year = datetime.year;
                         led_seg_buf[4] = led_seg_code[year % 10] | SEG_DOT;
                         year /= 10;
@@ -114,7 +271,13 @@ void main(void) {
                         led_seg_buf[6] = led_seg_code[year % 10];
                         year /= 10;
                         led_seg_buf[7] = led_seg_code[year % 10];
+                    } else {
+                        led_seg_buf[4] = SEG_OFF | SEG_DOT;
+                        led_seg_buf[5] = led_seg_buf[6] = led_seg_buf[7] =
+                            SEG_OFF;
                     }
+
+                    change_date_ticks--;
                 }
             }
             led_seg_draw_cycle(led_seg_buf, 100);
@@ -163,8 +326,9 @@ void main(void) {
                 }
             }
             led_seg_draw_cycle(led_seg_buf, 100);
-        } else if (clock_mode == 2) {
-            ;
+        } else {  // 未知模式
+            SET_LED_SEG_BUF_ERROR();
+            led_seg_draw_cycle(led_seg_buf, 100);
         }
     }
 }
