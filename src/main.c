@@ -47,6 +47,8 @@ byte clock_mode = 0;
 #define CLOCK_MODE_NEXT() \
     { clock_mode = CLOCK_MODE_MOD((clock_mode + 1)); }
 
+#define CHANGE_TICKS_PER_CYCLE 100
+
 // 宏定义：判断YEAR是否为闰年
 #define IS_LEAP_YEAR(YEAR) ((!(YEAR % 100)) ? (!(YEAR % 400)) : (!(YEAR % 4)))
 // 每个月的天数（2月份需特判）
@@ -113,10 +115,10 @@ void main(void) {
                 led_seg_buf[6] = led_seg_code[year % 10];
                 year /= 10;
                 led_seg_buf[7] = led_seg_code[year % 10];
-                // 设置与日期修改功能相关的参数
+                // 设置与日期修改模式相关的参数
                 change_date_select = 0;  // 默认不处于修改状态
                 change_date_light = 1;  // select选定的时间单位目前是否应该点亮
-                change_date_ticks = 100;  // 点亮的tick次数
+                change_date_ticks = CHANGE_TICKS_PER_CYCLE;  // 点亮的tick次数
                 change_date_press = 0;
                 no_or_up_or_down = 0;
                 // 本模式已初始化
@@ -124,7 +126,7 @@ void main(void) {
             } else {
                 if (!change_date_ticks) {
                     change_date_light = !change_date_light;
-                    change_date_ticks = 100;
+                    change_date_ticks = CHANGE_TICKS_PER_CYCLE;
                     change_date_press = 0;
                     no_or_up_or_down = 0;
                 }
@@ -150,7 +152,7 @@ void main(void) {
                         case 0x8:
                             delay_5us(1500);
                             if (!KEY_K4) {
-                                change_date_ticks = 100;
+                                change_date_ticks = CHANGE_TICKS_PER_CYCLE;
                                 change_date_select =
                                     (change_date_select + 1) % 4;
                             }
@@ -299,32 +301,141 @@ void main(void) {
                 led_seg_buf[5] = led_seg_code[hour % 10];
                 led_seg_buf[6] = SEG_OFF;
                 led_seg_buf[7] = SEG_OFF;
+                // 设置与时间修改模式相关的参数
+                change_time_select = 0;  // 默认不处于修改状态
+                change_time_light = 1;  // select选定的时间单位目前是否应该点亮
+                change_time_ticks = CHANGE_TICKS_PER_CYCLE;  // 点亮的tick次数
+                change_time_press = 0;
+                no_or_up_or_down = 0;
                 // 本模式已初始化
                 modeinfo.mode_1_inited = 1;
             } else {
-                // 判断需要发生更新的流程设计在多数情况下是合理的
-                // 不必担心局部更新会导致某些情况下错过特定刷新条件导致该刷新的时间（时/分/秒）没被刷新
-                // 但前提是，中断切出本模式的时间尽可能低于1s，否则有时候可能会导致分钟未能更新的bug
-                // 设计时尚未发生以上提到的这种情况，这里先提个醒，防止将来踩坑
-                // 制成实际产品时不应有任何致命问题
-                // 当然，预防这种中断切出超过1s的情况目前想到了一种野路子做法：
-                // 多判断sec == 1, sec == 2, ....的情况
-                datetime.sec = DS1302_GET_SEC();
-                led_seg_buf[0] = led_seg_code[datetime.sec % 10];
-                led_seg_buf[1] = led_seg_code[datetime.sec / 10];
-                if (!datetime.sec) {  // datetime.sec == 0，需要刷新分钟
-                    datetime.min = DS1302_GET_MIN();
-                    led_seg_buf[2] = led_seg_code[datetime.min % 10] | SEG_DOT;
-                    led_seg_buf[3] = led_seg_code[datetime.min / 10];
-                    if (!datetime.min) {  // datetime.min == 0，需要刷新小时
-                        datetime.hour = DS1302_GET_HOUR();
-                        hour = datetime.hour;
-                        led_seg_buf[4] = led_seg_code[hour % 10] | SEG_DOT;
-                        hour /= 10;
-                        led_seg_buf[5] = led_seg_code[hour % 10];
+                if (!change_time_ticks) {
+                    change_time_light = !change_time_light;
+                    change_time_ticks = CHANGE_TICKS_PER_CYCLE;
+                    change_time_press = 0;
+                    no_or_up_or_down = 0;
+                }
+
+                // 扫描式检测独立按键
+                if (!change_time_press) {
+                    KEY4_PORT = 0xFF;
+                    switch ((~KEY4_PORT) & 0x0F) {
+                        case 0x1:
+                            delay_5us(1500);
+                            if (!KEY_K1) {
+                                no_or_up_or_down = 1;
+                            }
+                            change_time_press = 1;
+                            break;
+                        case 0x2:
+                            delay_5us(1500);
+                            if (!KEY_K2) {
+                                no_or_up_or_down = 2;
+                            }
+                            change_time_press = 1;
+                            break;
+                        case 0x8:
+                            delay_5us(1500);
+                            if (!KEY_K4) {
+                                change_time_ticks = CHANGE_TICKS_PER_CYCLE;
+                                change_time_select =
+                                    (change_time_select + 1) % 4;
+                            }
+                            change_time_press = 1;
+                            break;
+                        default:
+                            break;
                     }
                 }
+
+                if (!change_time_select) {
+                    // 判断需要发生更新的流程设计在多数情况下是合理的
+                    // 不必担心局部更新会导致某些情况下错过特定刷新条件导致该刷新的时间（时/分/秒）没被刷新
+                    // 但前提是，中断切出本模式的时间尽可能低于1s，否则有时候可能会导致分钟未能更新的bug
+                    // 设计时尚未发生以上提到的这种情况，这里先提个醒，防止将来踩坑
+                    // 制成实际产品时不应有任何致命问题
+                    // 当然，预防这种中断切出超过1s的情况目前想到了一种野路子做法：
+                    // 多判断sec == 1, sec == 2, ....的情况
+                    datetime.sec = DS1302_GET_SEC();
+                    led_seg_buf[0] = led_seg_code[datetime.sec % 10];
+                    led_seg_buf[1] = led_seg_code[datetime.sec / 10];
+                    if (!datetime.sec) {  // datetime.sec == 0，需要刷新分钟
+                        datetime.min = DS1302_GET_MIN();
+                        led_seg_buf[2] =
+                            led_seg_code[datetime.min % 10] | SEG_DOT;
+                        led_seg_buf[3] = led_seg_code[datetime.min / 10];
+                        if (!datetime.min) {  // datetime.min == 0，需要刷新小时
+                            datetime.hour = DS1302_GET_HOUR();
+                            hour = datetime.hour;
+                            led_seg_buf[4] = led_seg_code[hour % 10] | SEG_DOT;
+                            hour /= 10;
+                            led_seg_buf[5] = led_seg_code[hour % 10];
+                        }
+                    }
+                } else {
+                    if (change_time_select == 1) {
+                        datetime.min = DS1302_GET_MIN();
+                        datetime.sec = DS1302_GET_SEC();
+                        if (no_or_up_or_down == 1) {
+                            datetime.hour = (datetime.hour + 1) % 24;
+                        } else if (no_or_up_or_down == 2) {
+                            datetime.hour =
+                                (datetime.hour < 1) ? 23 : (datetime.hour - 1);
+                        }
+                        // 立即设置新的时
+                        ds1302_set_hour(datetime.hour);
+                        no_or_up_or_down = 0;
+                    } else if (change_time_select == 2) {
+                        datetime.hour = DS1302_GET_HOUR();
+                        datetime.sec = DS1302_GET_SEC();
+                        if (no_or_up_or_down == 1) {
+                            datetime.min = (datetime.min + 1) % 60;
+                        } else if (no_or_up_or_down == 2) {
+                            datetime.min =
+                                (datetime.min < 1) ? 59 : (datetime.min - 1);
+                        }
+                        // 立即设置新的分
+                        ds1302_set_min(datetime.min);
+                        no_or_up_or_down = 0;
+                    } else if (change_time_select == 3) {
+                        datetime.hour = DS1302_GET_HOUR();
+                        datetime.min = DS1302_GET_MIN();
+                        if (no_or_up_or_down == 1) {
+                            datetime.sec = (datetime.sec + 1) % 60;
+                        } else if (no_or_up_or_down == 2) {
+                            datetime.sec =
+                                (datetime.sec < 1) ? 59 : (datetime.sec - 1);
+                        }
+                        // 立即设置新的秒
+                        ds1302_set_sec(datetime.sec);
+                        no_or_up_or_down = 0;
+                    }
+                }
+
+                if (change_time_select != 3 || change_time_light) {
+                    led_seg_buf[0] = led_seg_code[datetime.sec % 10];
+                    led_seg_buf[1] = led_seg_code[datetime.sec / 10];
+                } else {
+                    led_seg_buf[0] = led_seg_buf[1] = SEG_OFF;
+                }
+                if (change_time_select != 2 || change_time_light) {
+                    led_seg_buf[2] = led_seg_code[datetime.min % 10] | SEG_DOT;
+                    led_seg_buf[3] = led_seg_code[datetime.min / 10];
+                } else {
+                    led_seg_buf[2] = SEG_OFF | SEG_DOT;
+                    led_seg_buf[3] = SEG_OFF;
+                }
+                if (change_time_select != 1 || change_time_light) {
+                    led_seg_buf[4] = led_seg_code[datetime.hour % 10] | SEG_DOT;
+                    led_seg_buf[5] = led_seg_code[datetime.hour / 10];
+                    led_seg_buf[6] = led_seg_buf[7] = SEG_OFF;
+                } else {
+                    led_seg_buf[4] = SEG_OFF | SEG_DOT;
+                    led_seg_buf[5] = led_seg_buf[6] = led_seg_buf[7] = SEG_OFF;
+                }
             }
+            change_time_ticks--;
             led_seg_draw_cycle(led_seg_buf, 100);
         } else {  // 未知模式
             SET_LED_SEG_BUF_ERROR();
