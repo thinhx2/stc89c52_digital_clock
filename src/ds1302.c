@@ -88,10 +88,55 @@ void ds1302_write(byte cmd, byte dat) {
     DS1302_IO = 0;
 }
 
+void ds1302_set_year(uint year) {
+    DS1302_CLR_WRITE_PROTECT();
+
+    year -= 2000;
+    ds1302_write(DS1302_CMD_YEAR, dec2bcd((byte)(year % 101)));
+
+    DS1302_SET_WRITE_PROTECT();
+}
+
+void ds1302_set_mon(byte mon) {
+    DS1302_CLR_WRITE_PROTECT();
+    ds1302_write(DS1302_CMD_MON, dec2bcd(mon));
+    DS1302_SET_WRITE_PROTECT();
+}
+
+void ds1302_set_day(byte day) {
+    DS1302_CLR_WRITE_PROTECT();
+    ds1302_write(DS1302_CMD_DAY, dec2bcd(day));
+    DS1302_SET_WRITE_PROTECT();
+}
+
+void ds1302_set_hour(byte hour) {
+    // 读取小时命令返回的字节的高3位
+    byte hour_flag = bcd2dec(ds1302_read(DS1302_CMD_HOUR)) & 0xE0;
+
+    DS1302_CLR_WRITE_PROTECT();
+    ds1302_write(DS1302_CMD_HOUR, dec2bcd(hour | hour_flag));
+    DS1302_SET_WRITE_PROTECT();
+}
+
+void ds1302_set_min(byte min) {
+    DS1302_CLR_WRITE_PROTECT();
+    ds1302_write(DS1302_CMD_MIN, dec2bcd(min));
+    DS1302_SET_WRITE_PROTECT();
+}
+
+void ds1302_set_sec(byte sec) {
+    byte ch = bcd2dec(ds1302_read(DS1302_CMD_SEC)) & 0x80;
+
+    DS1302_CLR_WRITE_PROTECT();
+    // 设置秒时注意保留原先的ch位
+    ds1302_write(DS1302_CMD_SEC, dec2bcd(ch ? (sec | 0x80) : (sec & 0x7F)));
+    DS1302_SET_WRITE_PROTECT();
+}
+
 void ds1302_set_datetime(struct DateTime* datetime) {
     byte ch = bcd2dec(ds1302_read(DS1302_CMD_SEC)) & 0x80;
     // 读取小时命令返回的字节的高3位
-    byte hour_high = bcd2dec(ds1302_read(DS1302_CMD_HOUR)) & 0xE0;
+    byte hour_flag = bcd2dec(ds1302_read(DS1302_CMD_HOUR)) & 0xE0;
 
     DS1302_CLR_WRITE_PROTECT();
 
@@ -99,11 +144,12 @@ void ds1302_set_datetime(struct DateTime* datetime) {
     //     // 初始化时间
     //     ds1302_cmd_set(DS1302_CMD_SEC, 0);
     // }
-    ds1302_write(DS1302_CMD_YEAR, dec2bcd((byte)(datetime->year - 2000)));
+    ds1302_write(DS1302_CMD_YEAR,
+                 dec2bcd((byte)((datetime->year - 2000) % 101)));
     ds1302_write(DS1302_CMD_MON, dec2bcd(datetime->mon));
     ds1302_write(DS1302_CMD_DAY, dec2bcd(datetime->day));
     // TODO: 实现12/24小时制切换时需要关照此处
-    ds1302_write(DS1302_CMD_HOUR, dec2bcd(datetime->hour | hour_high));
+    ds1302_write(DS1302_CMD_HOUR, dec2bcd(datetime->hour | hour_flag));
     ds1302_write(DS1302_CMD_MIN, dec2bcd(datetime->min));
     ds1302_write(DS1302_CMD_SEC,
                  dec2bcd(ch ? (datetime->sec | 0x80) : (datetime->sec & 0x7F)));
@@ -113,13 +159,13 @@ void ds1302_set_datetime(struct DateTime* datetime) {
 }
 
 void ds1302_get_datetime(struct DateTime* datetime) {
-    datetime->year = bcd2dec(ds1302_read(DS1302_CMD_YEAR)) + 2000;
-    datetime->mon = bcd2dec(ds1302_read(DS1302_CMD_MON));
-    datetime->day = bcd2dec(ds1302_read(DS1302_CMD_DAY));
+    datetime->year = DS1302_GET_YEAR();
+    datetime->mon = DS1302_GET_MON();
+    datetime->day = DS1302_GET_DAY();
     // TODO: 实现12/24小时制切换时需要关照此处
-    datetime->hour = bcd2dec(ds1302_read(DS1302_CMD_HOUR)) & 0x1F;
-    datetime->min = bcd2dec(ds1302_read(DS1302_CMD_MIN));
-    datetime->sec = bcd2dec(ds1302_read(DS1302_CMD_SEC)) & 0x7F;
+    datetime->hour = DS1302_GET_HOUR();
+    datetime->min = DS1302_GET_MIN();
+    datetime->sec = DS1302_GET_SEC();
 }
 
 void ds1302_run(bit is_run) {

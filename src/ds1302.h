@@ -89,9 +89,16 @@ void ds1302_write(byte cmd, byte dat);
 #define DS1302_GET_YEAR() (bcd2dec(ds1302_read(DS1302_CMD_YEAR)) + 2000)
 #define DS1302_GET_MON() (bcd2dec(ds1302_read(DS1302_CMD_MON)))
 #define DS1302_GET_DAY() (bcd2dec(ds1302_read(DS1302_CMD_DAY)))
+// TODO: 实现12/24小时制切换时需要关照此处
 #define DS1302_GET_HOUR() (bcd2dec(ds1302_read(DS1302_CMD_HOUR)) & 0x1F)
 #define DS1302_GET_MIN() (bcd2dec(ds1302_read(DS1302_CMD_MIN)))
 #define DS1302_GET_SEC() (bcd2dec(ds1302_read(DS1302_CMD_SEC)) & 0x7F)
+void ds1302_set_year(uint year);
+void ds1302_set_mon(byte mon);
+void ds1302_set_day(byte day);
+void ds1302_set_hour(byte hour);
+void ds1302_set_min(byte min);
+void ds1302_set_sec(byte sec);
 
 // TODO: 突发模式读写
 
